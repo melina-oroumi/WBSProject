@@ -1,10 +1,10 @@
 # WBSProject
 
-1. Task class
-2. WBS tree
-3. Find tasks
-4. Display tree
-5. Load WBS file
+1. Task class - done
+2. WBS tree - done
+3. Find tasks - done
+4. Display tree - done
+5. Load WBS file - done
 6. Save WBS file
 7. Calculate total effort
 8. Calculate unknown tasks

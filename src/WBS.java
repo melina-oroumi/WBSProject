@@ -41,4 +41,36 @@ public class WBS {
             displayRecursive(child, level + 1);
         }
     }
+
+    public Task findTask(String id) {
+        
+        for (Task task : rootTasks) {
+
+            Task result = findTaskRecursive(task, id);
+
+            if (result != null) {
+                return result;
+            }    
+        }
+
+        return null;
+    }
+
+    private Task findTaskRecursive(Task current, String id) {
+
+        if (current.getId().equals(id)) {
+            return current;
+        }
+
+        for (Task child : current.getSubtasks()) {
+
+            Task result = findTaskRecursive(child, id);
+
+            if (result != null) {
+                return result;
+            }
+        }
+
+        return null;
+    }
 }

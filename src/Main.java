@@ -26,5 +26,13 @@ public class Main {
         wbs.addRootTask(design);
 
         wbs.display();
+
+        System.out.println();
+
+        Task found = wbs.findTask("E");
+
+        if (found != null) {
+            System.out.println("Found: " + found.getDescription());
+        }
     }
 }

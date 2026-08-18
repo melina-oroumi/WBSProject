@@ -1,12 +1,14 @@
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
 public class WBSFileManager {
-    public static WBS load(String filename) {
 
+    public static WBS load(String filename) {
         WBS wbs = new WBS();
 
         // Stores tasks using their ID
@@ -17,16 +19,12 @@ public class WBSFileManager {
 
         try (BufferedReader reader = new BufferedReader(
                 new FileReader(filename))) {
-            
             String line;
 
             // CREATE ALL TASKS
-
             while ((line = reader.readLine()) != null) {
 
-                if (line.trim().isEmpty()) {
-                    continue;
-                }
+                if (line.trim().isEmpty()) { continue; }
 
                 String[] fields = line.split(";", -1);
 
@@ -45,7 +43,6 @@ public class WBSFileManager {
                     String effortText = fields[3].trim();
 
                     if (!effortText.isEmpty()) {
-
                         try {
                             effort = Integer.parseInt(effortText);
                         } catch (NumberFormatException e) {
@@ -73,7 +70,6 @@ public class WBSFileManager {
             }
 
             // BUILD TREE
-
             for (Task task : tasks.values()) {
 
                 String parentID = parentIDs.get(task.getId());
@@ -95,11 +91,49 @@ public class WBSFileManager {
             }
 
         } catch (IOException e) {
-
             System.out.println("Error reading file: " + e.getMessage());
+            return null;
         }
 
         return wbs;
 
+    }
+
+    public static void save(WBS wbs, String filename) {
+
+        try (BufferedWriter writer = new BufferedWriter(
+                new FileWriter(filename))) {
+        
+            for (Task task : wbs.getRootTasks()) {
+                saveTask(writer, task, "");
+            }
+
+            System.out.println("WBS saved successfully.");
+
+        } catch (IOException e) {
+            System.out.println("Error saving file: " + e.getMessage());
+        }
+    }
+
+    private static void saveTask(BufferedWriter writer, Task task, String parentID) throws IOException {
+        writer.write(parentID);
+        writer.write(" ; ");
+
+        writer.write(task.getId());
+        writer.write(" ; ");
+
+        writer.write(task.getDescription());
+
+        if (task.getEffort() != null) {
+            writer.write(" ; ");
+            writer.write(String.valueOf(task.getEffort()));
+        }
+
+        writer.newLine();
+
+        // Save all children
+        for (Task child : task.getSubtasks()) {
+            saveTask(writer, child, task.getId());
+        }
     }
 }

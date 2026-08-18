@@ -73,4 +73,54 @@ public class WBS {
 
         return null;
     }
+
+    public int getTotalEffort() {
+        int total = 0;
+
+        for (Task task : rootTasks) {
+            total += getTotalEffortRecursive(task);
+        }
+
+        return total;
+    }
+
+    private int getTotalEffortRecursive(Task task) {
+        int total = 0;
+
+        // If this task has an effort estimate, add it
+        if (task.getEffort() != null) {
+            total += task.getEffort();
+        }
+
+        // Add effort from all subtasks
+        for (Task child : task.getSubtasks()) {
+            total += getTotalEffortRecursive(child);
+        }
+
+        return total;
+    }
+
+    public int getUnknownTaskCount() {
+        int count = 0;
+
+        for (Task task : rootTasks) {
+            count += getUnknownTaskCountRecursive(task);
+        }
+        
+        return count;
+    }
+
+    private int getUnknownTaskCountRecursive(Task task) {
+        if (!task.hasSubtasks() && task.getEffort() == null) {
+            return 1;
+        }
+
+        int count = 0;
+
+        for (Task child : task.getSubtasks()) {
+            count += getUnknownTaskCountRecursive(child);
+        }
+
+        return count;
+    }
 }

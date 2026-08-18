@@ -1,5 +1,6 @@
 public class Main {
     public static void main(String[] args) {
+
         if (args.length != 1) {
             System.out.println("Usage: java Main <filename>");
             return;
@@ -14,7 +15,13 @@ public class Main {
             return;
         }
 
+        System.out.println("WBS:");
         wbs.display();
+
+        System.out.println();
+
+        System.out.println("Total known effort = " + wbs.getTotalEffort());
+        System.out.println("Unknown tasks = " + wbs.getUnknownTaskCount());
 
         WBSFileManager.save(wbs, filename);
     }

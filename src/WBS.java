@@ -1,126 +1,96 @@
+//
+// WBS.java: Manages the overall WBS
+//
+
 import java.util.ArrayList;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 public class WBS {
-    private List<Task> rootTasks;
+    private final List<WBSComponent> rootTasks;
+    private final Map<String, WBSComponent> tasks;
 
     public WBS() {
         rootTasks = new ArrayList<>();
+        tasks = new HashMap<>();
     }
 
-    public void addRootTask(Task task) {
+    public void addRootTask(WBSComponent task) {
         rootTasks.add(task);
+        tasks.put(task.getId(),task);
     }
 
-    public List<Task> getRootTasks() {
+    public void addTask(WBSComponent task) {
+        tasks.put(task.getId(), task);
+    }
+
+    public WBSComponent findTask(String id) {
+        return tasks.get(id);
+    }
+
+    public List<WBSComponent> getRootTasks() {
         return rootTasks;
     }
 
     public void display() {
 
-        for (Task task : rootTasks) {
-            displayRecursive(task, 0);
+        for (WBSComponent task : rootTasks) {
+            task.display(0);
         }
-    }
-
-    private void displayRecursive(Task task, int level) {
-        
-        for (int i = 0; i < level; i++) {
-            System.out.print(" ");
-        }
-
-        System.out.print(task.getId() + ": " + task.getDescription());
-
-        if(task.getEffort() != null) {
-            System.out.print(", effort = " + task.getEffort());
-        }
-
-        System.out.println();
-
-        for (Task child : task.getSubtasks()) {
-            displayRecursive(child, level + 1);
-        }
-    }
-
-    public Task findTask(String id) {
-        
-        for (Task task : rootTasks) {
-
-            Task result = findTaskRecursive(task, id);
-
-            if (result != null) {
-                return result;
-            }    
-        }
-
-        return null;
-    }
-
-    private Task findTaskRecursive(Task current, String id) {
-
-        if (current.getId().equals(id)) {
-            return current;
-        }
-
-        for (Task child : current.getSubtasks()) {
-
-            Task result = findTaskRecursive(child, id);
-
-            if (result != null) {
-                return result;
-            }
-        }
-
-        return null;
     }
 
     public int getTotalEffort() {
         int total = 0;
-
-        for (Task task : rootTasks) {
-            total += getTotalEffortRecursive(task);
+        for (WBSComponent task : rootTasks) {
+            total += calculateEffort(task);
         }
-
         return total;
     }
 
-    private int getTotalEffortRecursive(Task task) {
+    private int calculateEffort(WBSComponent task) {
+        if (!task.hasSubtasks()) {
+            return getEffortValue(task);
+        }
+        return calculateChildrenEffort(task);
+    }
+
+    private int getEffortValue(WBSComponent task) {
+        return task.getEffort() == null ? 0 : task.getEffort();
+    }
+
+    private int calculateChildrenEffort(WBSComponent task) {
         int total = 0;
+        CompositeTask composite = (CompositeTask) task;
 
-        // If this task has an effort estimate, add it
-        if (task.getEffort() != null) {
-            total += task.getEffort();
+        for (WBSComponent child : composite.getSubtasks()) {
+            total += calculateEffort(child);
         }
-
-        // Add effort from all subtasks
-        for (Task child : task.getSubtasks()) {
-            total += getTotalEffortRecursive(child);
-        }
-
         return total;
     }
 
     public int getUnknownTaskCount() {
         int count = 0;
-
-        for (Task task : rootTasks) {
-            count += getUnknownTaskCountRecursive(task);
+        for (WBSComponent task : rootTasks) {
+            count += countUnknown(task);
         }
-        
         return count;
     }
 
-    private int getUnknownTaskCountRecursive(Task task) {
-        if (!task.hasSubtasks() && task.getEffort() == null) {
-            return 1;
+    private int countUnknown(WBSComponent task) {
+        if (!task.hasSubtasks()) {
+            return task.getEffort() == null ? 1 : 0;
         }
+        return countUnknownChildren(task);
+    }
 
+    private int countUnknownChildren(WBSComponent task) {
         int count = 0;
+        CompositeTask composite = (CompositeTask) task;
 
-        for (Task child : task.getSubtasks()) {
-            count += getUnknownTaskCountRecursive(child);
+        for (WBSComponent child : composite.getSubtasks()) {
+            count += countUnknown(child);
         }
-
         return count;
     }
 }

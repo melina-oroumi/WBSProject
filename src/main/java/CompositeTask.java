@@ -57,7 +57,7 @@ public class CompositeTask implements WBSComponent {
     }
 
     private void printIndent(int level) {
-        System.out.print(" ".repeat(level));
+        System.out.print("  ".repeat(level));
     }
 
     private void displayChildren(int level) {

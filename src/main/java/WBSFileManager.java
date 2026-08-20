@@ -13,42 +13,51 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public class WBSFileManager {
 
-    public static WBS load(String filename) {
+    private static final int MIN_FIELDS = 3;
+    private static final int MAX_FIELDS = 4;
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(WBSFileManager.class);
+
+    public static WBS load(String filename) throws WBSException {
+        LOGGER.info("Loading WBS file: {}", filename);
+
         List<TaskRecord> records = readRecords(filename);
-
-        if (records == null) {
-            return null;
-        }
-
         return buildWBS(records);
     }
 
-    private static List<TaskRecord> readRecords(String filename) {
+    private static List<TaskRecord> readRecords(String filename) throws WBSException {
         List<TaskRecord> records = new ArrayList<>();
 
         try (BufferedReader reader = new BufferedReader(new FileReader(filename))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                if (!line.trim().isEmpty()) {
-                    addRecord(records, line);
+
+            while (true) {
+                String line = reader.readLine();
+
+                if (line == null) {
+                    break;
                 }
+
+                addRecord(records,line);
             }
             return records;
+
         } catch (IOException e) {
-            System.out.println("Error reading file: " + e.getMessage());
-            return null;
+            LOGGER.error("Unable to read WBS file: {}",filename, e);
+
+            throw new WBSException("Unable to read WBS file: " + filename, e);
         }
     }
 
-    private static void addRecord(List<TaskRecord> records, String line) {
+    private static void addRecord(List<TaskRecord> records, String line) throws WBSException {
         String[] fields = line.split(";", -1);
 
-        if (fields.length != 3 && fields.length != 4) {
-            System.out.println("Invalid line: " + line);
-            return;
+        if (fields.length != MIN_FIELDS && fields.length != MAX_FIELDS) {
+            throw new WBSException("Invalid WBS line: " + line);
         }
 
         String parentID = fields[0].trim();
@@ -59,8 +68,8 @@ public class WBSFileManager {
         records.add(new TaskRecord(parentID, taskID, description, effort));
     }
 
-    private static Integer parseEffort(String[] fields, String taskID) {
-        if (fields.length != 4) {
+    private static Integer parseEffort(String[] fields, String taskID) throws WBSException {
+        if (fields.length != MAX_FIELDS) {
             return null;
         }
 
@@ -71,17 +80,24 @@ public class WBSFileManager {
         }
 
         try {
-            return Integer.parseInt(text);
+            int effort = Integer.parseInt(text);
+
+            if (effort <= 0) {
+                throw new WBSException("Effort must be positive for task: " + taskID);
+            }
+
+            return effort;
         } catch (NumberFormatException e) {
-            System.out.println("Invalid effort for task: " + taskID);
-            return null;
+            throw new WBSException("Invalid effort for task: " + taskID, e);
         }
     }
 
-    private static WBS buildWBS(List<TaskRecord> records) {
+    private static WBS buildWBS(List<TaskRecord> records) throws WBSException {
+
         WBS wbs = new WBS();
 
-        Map<String, TaskRecord> recordMap = createRecordMap(records);
+        validateUniqueIDs(records);
+        
         Set<String> parentIDs = findParentIDs(records);
         Map<String, WBSComponent> tasks = createTasks(records, parentIDs);
 
@@ -90,13 +106,22 @@ public class WBSFileManager {
         return wbs;
     }
 
-    private static Map<String, TaskRecord> createRecordMap(List<TaskRecord> records) {
-        Map<String, TaskRecord> result = new HashMap<>();
+    private static void validateUniqueIDs(List<TaskRecord> records) throws WBSException {
+        Set<String> ids = new HashSet<>();
 
         for (TaskRecord record : records) {
-            result.put(record.id(), record);
+            if (!ids.add(record.id())) {
+                throw new WBSException(
+                    "Duplicate task ID: " + record.id()
+                );
+            }
         }
-        return result;
+    }
+
+    private static void checkDuplicate(Map<String, TaskRecord> records, TaskRecord record) throws WBSException {
+        if (records.containsKey(record.id())) {
+            throw new WBSException("Duplicate task ID: " + record.id());
+        }
     }
 
     private static Set<String> findParentIDs(List<TaskRecord> records) {
@@ -121,6 +146,8 @@ public class WBSFileManager {
     }
 
     private static WBSComponent createTask(TaskRecord record, Set<String> parentIDs) {
+        LOGGER.debug("Creating task: {}", record.id());
+
         if (parentIDs.contains(record.id())) {
             return new CompositeTask(record.id(), record.description());
         }
@@ -128,7 +155,7 @@ public class WBSFileManager {
         return new LeafTask(record.id(), record.description(), record.effort());
     }
 
-    private static void connectTasks(WBS wbs, List<TaskRecord> records, Map<String, WBSComponent> tasks) {
+    private static void connectTasks(WBS wbs, List<TaskRecord> records, Map<String, WBSComponent> tasks) throws WBSException{
         for (TaskRecord record : records) {
             WBSComponent task = tasks.get(record.id());
 
@@ -140,25 +167,37 @@ public class WBSFileManager {
         }
     }
 
-    private static void addToParent(TaskRecord record, Map<String, WBSComponent> tasks) {
+    private static void addToParent(TaskRecord record, Map<String, WBSComponent> tasks) throws WBSException {
         WBSComponent parent = tasks.get(record.parentID());
 
-        if (parent instanceof CompositeTask composite) {
-            composite.addSubtask(tasks.get(record.id()));
-        } else {
-            System.out.println("Invalid parent for task: " + record.id());
+        if (parent == null) {
+            throw new WBSException("Parent task not found: " + record.parentID());
         }
+
+        addChild(parent, tasks.get(record.id()));
     }
 
-    public static void save(WBS wbs, String filename) {
+    private static void addChild(WBSComponent parent, WBSComponent child) throws WBSException {
+
+        if (parent instanceof CompositeTask composite) {
+            composite.addSubtask(child);
+            return;
+        }
+
+        throw new WBSException("Task cannot contain subtasks: " + parent.getId());
+    }
+
+    public static void save(WBS wbs, String filename) throws WBSException {
         try (BufferedWriter writer = new BufferedWriter(new FileWriter(filename))) {
             for (WBSComponent task : wbs.getRootTasks()) {
                 saveTask(writer, task, "");
             }
 
-            System.out.println("WBS saved successfully.");
+            LOGGER.info("WBS saved successfully: {}", filename);
         } catch (IOException e) {
-            System.out.println("Error saving fdile: " + e.getMessage());
+            LOGGER.error("Unable to save WBS file: {}", filename, e);
+
+            throw new WBSException("Unable to save WBS file: " + filename, e);
         }
     }
 
